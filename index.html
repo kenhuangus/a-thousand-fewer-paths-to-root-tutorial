@@ -196,6 +196,14 @@ svg text{font-family:'Inter',sans-serif}
 .pc-box h4{font-size:.92rem;margin-bottom:.25rem}
 .pc-mid{align-self:center;font-size:1.6rem;color:var(--accent);font-weight:800;text-align:center}
 
+/* ---------- Tech comparison table ---------- */
+.tech-table{width:100%;border-collapse:collapse;font-size:.9rem;background:#fff}
+.tech-table th{font-family:'Space Grotesk',sans-serif;text-align:left;font-size:.82rem;letter-spacing:.02em;background:var(--ink);color:#fff;padding:10px 12px}
+.tech-table td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:top;line-height:1.4}
+.tech-table td:first-child{font-weight:700;white-space:nowrap}
+.tech-table .cost{font-family:'Space Grotesk',sans-serif;font-weight:800;white-space:nowrap}
+@media (max-width:760px){.tech-table,.tech-table tbody,.tech-table tr,.tech-table td{display:block;width:100%}.tech-table thead{display:none}.tech-table tr{border-top:2px solid var(--line);padding:6px 0}.tech-table td{border-top:none;padding:6px 12px}.tech-table td:first-child{white-space:normal}}
+
 /* ---------- Controls (template) ---------- */
 .controls{position:fixed;left:0;right:0;bottom:0;height:var(--ctrl-h);z-index:50;background:rgba(11,14,20,.97);border-top:1px solid var(--line-dark);display:flex;align-items:center;gap:14px;padding:0 14px;color:#eceef2}
 .progress{position:absolute;top:-1px;left:0;height:3px;background:var(--accent);width:0;transition:width .35s ease}
@@ -211,9 +219,9 @@ svg text{font-family:'Inter',sans-serif}
 
 /* Reveal animation on slide activation — kept short so controls on the
    active slide are fully opaque almost immediately */
-.rv{opacity:0;transform:translateY(10px)}
-.slide.is-active .rv{animation:rise .3s ease forwards;animation-delay:calc(var(--d,0)*55ms)}
-@keyframes rise{to{opacity:1;transform:none}}
+.rv{opacity:1}
+.slide.is-active .rv{animation:rise .3s ease both;animation-delay:calc(var(--d,0)*55ms)}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .rv:has(> button), .rv:has(button.replay), p.lead.rv:has(button){animation-delay:0s!important}
 @media (prefers-reduced-motion:reduce){
   .slide,.fbar,.bar-rect,.esc-token{transition:none!important}
@@ -632,7 +640,228 @@ svg text{font-family:'Inter',sans-serif}
   </div>
 </section>
 
-<!-- ============ SLIDE 14 · SYNTHESIS ============ -->
+<!-- ============ SLIDE 14 · TECH OVERVIEW ============ -->
+<section class="slide" data-title="Tech Deep Dive · The Four Checks Compared">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">Tech Deep Dive · Start Here</span>
+    <h2 class="h2 rv" style="--d:1">Four Checks. Four Different Questions.</h2>
+    <p class="lead rv" style="--d:2">The next five slides explain each tool the team used. The team ran the checks in this order. Each check answers one question, and each check costs a different amount.</p>
+    <div class="chart-wrap rv" style="--d:3">
+      <h3>The four checks in order</h3>
+      <div class="sub">Costs are the totals OpenAI reported for the second scan. Per-candidate costs use the counts OpenAI reported.</div>
+      <div style="overflow-x:auto">
+      <table class="tech-table">
+        <thead><tr><th>Check</th><th>What the agent does</th><th>Question it answers</th><th>Total cost</th></tr></thead>
+        <tbody>
+          <tr><td>1 · KASAN triage</td><td>The agent runs a test program in a virtual machine. KASAN watches memory while the program runs.</td><td>Does the bug exist?</td><td class="cost">$73,330</td></tr>
+          <tr><td>2 · Screening — static triage</td><td>The agent reads the report, the crash log, and the source code. The agent runs no code.</td><td>Does this bug have a path to an exploit?</td><td class="cost">$44,194</td></tr>
+          <tr><td>3 · Info-leak exploit</td><td>The agent builds a program that reads kernel memory the user should not see.</td><td>Can a low-privileged user learn kernel addresses?</td><td class="cost">$84,929</td></tr>
+          <tr><td>4 · LPE exploit — ExploitDev</td><td>The agent builds a program that gains root in a virtual machine with normal protections on.</td><td>Can a low-privileged user gain root?</td><td class="cost">$691,000</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="legend"><span>1,724 of 2,308 candidates passed check 1</span><span>1,551 candidates passed check 2: 313 info-leak and 1,238 LPE</span><span>291 info-leak programs and 1,169 LPE programs worked</span></div>
+    </div>
+    <div class="insight rv" style="--d:4">
+      <div class="ih">Cheap checks ran first</div>
+      <p>The team ran the cheap checks first. KASAN triage and screening together cost $117,524. Exploit work cost $775,929. The team spent the large amount only on candidates that had passed the two cheap checks.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 15 · KASAN DEEP DIVE ============ -->
+<section class="slide slide--alt" data-title="Tech Deep Dive · KASAN Triage">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">Tech Deep Dive · 1 of 4</span>
+    <h2 class="h2 rv" style="--d:1">KASAN Triage: The Agent Runs the Bug</h2>
+    <p class="lead rv" style="--d:2">KASAN is Kernel Address Sanitizer. Google engineers built KASAN into the Linux kernel. KASAN adds memory checks to kernel code at build time, and KASAN reports a memory error at the moment the error happens.</p>
+    <div class="cols rv" style="--d:3">
+      <div class="card">
+        <h3>Why the team used KASAN</h3>
+        <ul class="tight">
+          <li>An Analyst report is a claim in text. The claim does not prove the bug exists.</li>
+          <li>KASAN gives the team a crash log from a real run. The log names the function, the address, and the size of the bad read or write.</li>
+          <li>The team set three tests for this stage: a low-privileged user can reach the code, the code needs no special capability, and the run produces a memory error KASAN can measure.</li>
+        </ul>
+        <h3 style="margin-top:.8rem">When the team used KASAN</h3>
+        <p>The team used KASAN in stage 2, after discovery and before screening. The triage agent wrote a proof-of-concept program for one candidate, ran the program in an isolated virtual machine, read the program output and the system console, changed the program, and ran the program again. The agent stopped when KASAN reported the bug or when the agent had no new way to trigger the bug.</p>
+      </div>
+      <div class="card">
+        <h3>What KASAN catches, and what KASAN misses</h3>
+        <ul class="tight">
+          <li><strong>KASAN catches:</strong> reads and writes past the end of a buffer, and use of memory after the kernel freed that memory.</li>
+          <li><strong>KASAN misses in most cases:</strong> logic errors with no bad memory access, data races between two threads, and reads of memory the kernel never set a value in.</li>
+          <li><strong>Cost of the checks:</strong> a KASAN kernel uses more memory and runs slower than a normal kernel. The team ran KASAN only in test machines, not in the exploit stage.</li>
+        </ul>
+        <div class="stat-row">
+          <div class="stat stat--teal"><div class="n">1,724</div><div class="l">candidates reproduced under KASAN</div></div>
+          <div class="stat"><div class="n">74.7%</div><div class="l">of 2,308 candidates reproduced</div></div>
+          <div class="stat stat--green"><div class="n">$73,330</div><div class="l">total cost of the validation stage</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:4">
+      <div class="ih">How KASAN differs from screening</div>
+      <p>KASAN triage runs code and watches the run. Screening reads code and logs and runs nothing. KASAN proves a bug triggers. Screening cannot prove that point, and screening does not try to prove that point.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 16 · SCREENING DEEP DIVE ============ -->
+<section class="slide" data-title="Tech Deep Dive · Screening and Static Triage">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">Tech Deep Dive · 2 of 4</span>
+    <h2 class="h2 rv" style="--d:1">Screening: The Agent Reads. The Agent Runs Nothing.</h2>
+    <p class="lead rv" style="--d:2">Screening is static triage. Static means the agent works from text: the validated report, the KASAN crash log, and the source code around the bug. The agent sorts each bug into one track and drops bugs with no path to an exploit.</p>
+    <div class="cols rv" style="--d:3">
+      <div class="card">
+        <h3>Why the team used screening</h3>
+        <ul class="tight">
+          <li>Exploit work cost $775,929 in total. Screening cost $44,194 in total.</li>
+          <li>The team paid the small cost first, so the team did not pay exploit cost for bugs with no exploit path.</li>
+          <li>Screening also split the work. ExploitDev agents for info leaks do a different job from ExploitDev agents for LPE, and each agent needs the right track at the start.</li>
+        </ul>
+        <h3 style="margin-top:.8rem">When the team used screening</h3>
+        <p>The team used screening after KASAN triage and before any exploit work. Only the 1,724 reproduced bugs entered screening. Only the 1,551 bugs that passed screening entered ExploitDev.</p>
+      </div>
+      <div class="card">
+        <h3>How the screening agent decided</h3>
+        <ul class="tight">
+          <li>The agent read the bug report and the crash log for the type of memory error and the size the attacker controls.</li>
+          <li>The agent read the source code for objects near the bug that an exploit could use.</li>
+          <li>The agent kept a bug if the bug had a plausible path to a read of kernel memory or to root.</li>
+          <li>The agent dropped a bug only when the agent found no plausible path.</li>
+        </ul>
+        <p>The team set the agent to keep too much, not too little. That choice passed some dead ends to ExploitDev. The team accepted that cost so the agent did not drop a serious bug at this stage.</p>
+        <div class="stat-row">
+          <div class="stat stat--blue"><div class="n">313</div><div class="l">bugs sorted to the info-leak track</div></div>
+          <div class="stat stat--accent"><div class="n">1,238</div><div class="l">bugs sorted to the LPE track</div></div>
+          <div class="stat stat--green"><div class="n">$44,194</div><div class="l">total screening cost — about $26 per bug screened</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:4">
+      <div class="ih">Static triage and dynamic triage test different points</div>
+      <p>KASAN triage is dynamic triage: the agent runs code, so the result proves the bug triggers. Screening is static triage: the agent reads text, so the result is a judgment about exploit path, not proof. The team needed both points, in that order.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 17 · INFO-LEAK DEEP DIVE ============ -->
+<section class="slide slide--alt" data-title="Tech Deep Dive · Info-Leak Exploits">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">Tech Deep Dive · 3 of 4</span>
+    <h2 class="h2 rv" style="--d:1">Info-Leak Exploits: The Agent Reads Kernel Memory</h2>
+    <p class="lead rv" style="--d:2">An info-leak exploit is a program that makes the kernel copy kernel memory to a low-privileged user. The user should not see that memory. The memory often holds kernel addresses.</p>
+    <div class="cols rv" style="--d:3">
+      <div class="card">
+        <h3>Why the team built info-leak exploits</h3>
+        <ul class="tight">
+          <li>KASLR randomizes where the kernel places code and data at each boot. An exploit that needs a fixed address fails when the address changes.</li>
+          <li>A leaked address tells the attacker where code or data sits in that boot. The attacker can then set the address in the next step of an LPE exploit.</li>
+          <li>A leak also proves impact on its own. Kernel addresses and kernel data are not public, and a low-privileged user has no right to read them.</li>
+        </ul>
+        <h3 style="margin-top:.8rem">When the team used this track</h3>
+        <p>The team used this track for the 313 bugs screening sorted as info-leak candidates. The team also used a leak as step 1 inside many LPE exploits, to defeat KASLR before the agent tried to change kernel data.</p>
+      </div>
+      <div class="card">
+        <h3>Why this track cost less than LPE work</h3>
+        <p>The validation stage had already produced a proof-of-concept program for each bug. The ExploitDev agent started from that program. The agent needed only one change in most cases: make the program return the leaked bytes to the user, in a form the agent could read.</p>
+        <div class="stat-row">
+          <div class="stat stat--blue"><div class="n">313 → 291</div><div class="l">candidates → working info-leak programs</div></div>
+          <div class="stat stat--green"><div class="n">$84,929</div><div class="l">total cost of this track</div></div>
+          <div class="stat"><div class="n">$271</div><div class="l">average cost per candidate in this track</div></div>
+        </div>
+        <h3 style="margin-top:.8rem">How an info leak differs from an LPE</h3>
+        <p>An info leak proves a read. The user learns data and gains no new right. An LPE proves a change in rights: the user gains root. A leak helps an LPE, and a leak alone does not give root.</p>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:4">
+      <div class="ih">One bug can sit in both tracks</div>
+      <p>Screening sorted each bug to one track for this run. In real exploit work, one agent often chains the two: the agent leaks an address first, then the agent uses that address in the LPE step. The two tracks are two proofs, not two kinds of bug.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 18 · LPE / EXPLOITDEV DEEP DIVE ============ -->
+<section class="slide" data-title="Tech Deep Dive · ExploitDev and LPE Exploits">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">Tech Deep Dive · 4 of 4</span>
+    <h2 class="h2 rv" style="--d:1">ExploitDev and LPE Exploits: The Agent Gains Root</h2>
+    <p class="lead rv" style="--d:2">LPE means local privilege escalation. An LPE exploit is a program a low-privileged user runs to gain root. ExploitDev is the name OpenAI gave the agents that built and tested these programs.</p>
+    <div class="cols rv" style="--d:3">
+      <div class="card">
+        <h3>Why the team tested under real protections</h3>
+        <p>The validation stage ran a KASAN kernel built for finding bugs. A crash in that kernel does not prove root on a normal system. So ExploitDev agents tested in virtual machines that ran a standard distribution kernel with four protections on:</p>
+        <ul class="tight">
+          <li><strong>KASLR</strong> — the kernel randomizes addresses at boot.</li>
+          <li><strong>SMEP</strong> — the processor blocks the kernel from running user code.</li>
+          <li><strong>SMAP</strong> — the processor blocks the kernel from reading user memory in the wrong way.</li>
+          <li><strong>HARDENED_USERCOPY</strong> — the kernel checks each copy between user memory and kernel memory.</li>
+        </ul>
+        <h3 style="margin-top:.8rem">When the team used ExploitDev</h3>
+        <p>The team used ExploitDev last, after KASAN triage and after screening. Only 1,238 LPE candidates reached this stage.</p>
+      </div>
+      <div class="card">
+        <h3>What one ExploitDev attempt does</h3>
+        <ul class="tight">
+          <li>The agent writes a plan for the exploit.</li>
+          <li>The agent picks a kernel object the exploit can spray or place next to the vulnerable object.</li>
+          <li>The agent triggers the bug and changes kernel data, in most new cases the data that records the user's rights.</li>
+          <li>The agent checks the result: a shell with uid 0 counts as root.</li>
+        </ul>
+        <div class="stat-row">
+          <div class="stat stat--accent"><div class="n">1,238 → 1,169</div><div class="l">candidates → working root exploits</div></div>
+          <div class="stat stat--green"><div class="n">$691,000</div><div class="l">total cost of LPE work</div></div>
+          <div class="stat"><div class="n">$558</div><div class="l">average cost per LPE candidate</div></div>
+        </div>
+        <p>One successful exploit cost about $359 on average. One failed attempt cost $3,922 on average across 69 failed cases. Race conditions drove much of that failed cost: the agent had to run the same trigger many times and wait for the right timing.</p>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:4">
+      <div class="ih">How LPE work differs from the three checks before it</div>
+      <p>KASAN triage proves a bug triggers. Screening judges whether a path exists. An info leak proves a read. An LPE exploit proves a change in rights, against the protections a real system runs. Only the LPE proof shows full impact.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 19 · OTHER TECH ============ -->
+<section class="slide slide--dark" data-title="Other Tools That Test What KASAN Misses">
+  <div class="slide__in">
+    <span class="kicker kicker--light rv" style="--d:0">Tech Deep Dive · Other Tools</span>
+    <h2 class="h2 h2--light rv" style="--d:1">Other Tools Test Cases KASAN Misses</h2>
+    <p class="lead lead--light rv" style="--d:2">OpenAI did not report that the team used the tools on this slide in the October run, and OpenAI gave no cost for them. Each tool below tests a case the four checks above do not cover well.</p>
+    <div class="cols rv" style="--d:3">
+      <div class="card">
+        <h3>Tools that find and test bugs</h3>
+        <ul class="tight">
+          <li><strong>KMSAN</strong> — the kernel tool reports use of memory that no code set a value in. KASAN does not cover that case well.</li>
+          <li><strong>UBSan</strong> — the tool reports undefined behavior in C code, such as signed integer overflow.</li>
+          <li><strong>KCSAN</strong> — the tool reports data races between threads. Races were a common reason a candidate in this run did not reproduce.</li>
+          <li><strong>KFENCE</strong> — the tool reports heap errors past a buffer end and use after free, with low overhead. A production kernel can run KFENCE. A production kernel cannot run KASAN at normal speed.</li>
+          <li><strong>Syzkaller and Syzbot</strong> — Syzkaller generates system call programs and runs them to force crashes. Syzbot runs Syzkaller on kernel code and publishes the crashes Syzkaller finds.</li>
+          <li><strong>Sparse, Smatch, Coverity, and CodeQL</strong> — these tools read code and run no code. A team can run them before dynamic triage to add candidates, or after triage to check variants of a confirmed bug.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Methods that build exploits</h3>
+        <ul class="tight">
+          <li><strong>Heap spray with standard objects</strong> — the exploit fills a kernel cache with objects the attacker controls, so the vulnerable object lands in a known place.</li>
+          <li><strong>Page grooming</strong> — the exploit arranges memory pages so the target object sits at the address the exploit needs. OpenAI reported 2 new page grooming techniques in this run.</li>
+          <li><strong>Data-only change</strong> — the exploit changes kernel data and does not change control flow. OpenAI reported 5 new data-only techniques in this run. Protections that watch control flow do not stop a data-only change.</li>
+          <li><strong>Type confusion</strong> — the kernel treats an object as the wrong type, and the exploit uses that mismatch to change more data. OpenAI reported 1 new technique of this kind.</li>
+          <li><strong>ret2usr and return-oriented programming</strong> — older methods send kernel execution to user code or to chained kernel code pieces. SMEP blocks ret2usr on the test machines in this run, so the agents in this run used object and data methods instead.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:4">
+      <div class="ih">How a team adds one of these tools</div>
+      <p style="color:#d6dce7">A team adds a tool at the stage that has the matching gap. A team that misses race bugs adds KCSAN at validation, next to KASAN. A team that misses uninitialized memory adds KMSAN at validation. A team that needs more candidates adds Syzkaller or a static analyzer at discovery. The new tool changes one stage. The order of the other stages stays the same.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 20 · SYNTHESIS ============ -->
 <section class="slide slide--dark" data-title="Synthesis: Six Lessons">
   <div class="slide__in">
     <span class="kicker kicker--light rv" style="--d:0">Synthesis</span>

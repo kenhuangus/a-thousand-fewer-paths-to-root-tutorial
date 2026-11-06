@@ -1,6 +1,6 @@
 # A thousand fewer paths to root — tutorial
 
-A 14-slide tutorial on OpenAI's Linux kernel pipeline.
+A 20-slide tutorial on OpenAI's Linux kernel pipeline.
 
 The pipeline found 2,308 candidate flaws. It reproduced 1,724 of them. It turned those into 948 distinct exploits that gave an unprivileged local user root access.
 
