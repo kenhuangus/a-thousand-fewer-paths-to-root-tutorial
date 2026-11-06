@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<link rel="icon" href="data:," />
+<title>A Thousand Fewer Paths to Root — Animated Tutorial</title>
+<meta name="description" content="An animated, slide-by-slide tutorial on OpenAI's Linux kernel vulnerability pipeline: 2,308 candidate findings, 1,724 reproduced, 948 privilege-escalation exploits — how each stage worked and what each stage cost." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Kalam:wght@400;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#0b0e14; --ink-2:#121722; --ink-3:#1a2232;
+  --paper:#fdfcf9; --paper-2:#f5f2eb;
+  --line:#e4dfd5; --line-dark:#222b3d;
+  --text:#181b22; --text-light:#eceef2;
+  --muted:#5e6676; --muted-light:#9ba4b5;
+  --accent:#ff6a2b; --accent-2:#ffb454; --accent-glow:rgba(255,106,43,.35);
+  --blue:#1971c2; --teal:#0c8599; --orange:#f08c00; --grape:#7048e8;
+  --red:#e03131; --green:#2b8a3e; --yellow:#f59f00; --indigo:#3b5bdb; --cyan:#099268;
+  --shadow:0 4px 20px rgba(11,14,20,.08); --shadow-lg:0 10px 30px rgba(11,14,20,.14);
+  --hand:'Kalam',cursive;
+  --bar-h:48px; --ctrl-h:54px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;padding:0}
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  color:var(--text); background:var(--ink); line-height:1.48;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+h1,h2,h3,h4{font-family:'Space Grotesk',system-ui,sans-serif;line-height:1.15;margin:0}
+a{color:inherit}
+button{font:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- Top bar (template) ---------- */
+.bar{
+  position:fixed;top:0;left:0;right:0;height:var(--bar-h);z-index:50;
+  display:flex;align-items:center;gap:1rem;padding:0 14px;
+  background:rgba(11,14,20,.97);border-bottom:1px solid var(--line-dark);color:#eceef2;
+}
+.bar__brand{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:.03em;font-size:.98rem;flex-shrink:0;display:inline-flex;align-items:center;gap:.5rem;white-space:nowrap}
+.bar__logo{color:var(--accent);font-size:1.2rem}
+.bar__title{font-family:var(--hand);color:var(--accent-2);font-size:1.05rem;margin:0 auto;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.bar__actions{display:flex;align-items:center;gap:.55rem;flex-shrink:0}
+.bar__btn{font-family:'Space Grotesk',sans-serif;font-size:.82rem;font-weight:600;color:#eceef2;background:var(--ink-2);border:1px solid #283347;border-radius:999px;padding:.34rem .85rem;cursor:pointer;transition:background .2s,border-color .2s}
+.bar__btn:hover{background:#1c2536;border-color:var(--accent-2)}
+.bar__cta{font-family:'Space Grotesk',sans-serif;font-size:.82rem;font-weight:700;color:#fff;background:var(--accent);padding:.36rem .95rem;border-radius:999px;box-shadow:0 4px 14px rgba(255,106,43,.4);text-decoration:none;white-space:nowrap;display:inline-flex;align-items:center}
+.bar__cta--alt{background:#1e2638;color:#eceef2;box-shadow:none;border:1px solid #2a354c}
+@media (max-width:760px){ .bar__title{display:none} .bar__cta{display:none} .bar__brand{font-size:.85rem} }
+
+/* ---------- Deck & slides (template) ---------- */
+.deck{position:fixed;top:var(--bar-h);left:0;right:0;bottom:var(--ctrl-h);overflow:hidden;background:var(--ink)}
+.slide{
+  position:absolute;inset:0;display:flex;padding:14px clamp(12px,2.2vw,34px);
+  background:var(--paper);opacity:0;visibility:hidden;transform:translateX(35px);
+  transition:opacity .4s ease,transform .4s ease,visibility .4s;overflow-y:auto;overflow-x:hidden;
+}
+.slide.is-active{opacity:1;visibility:visible;transform:none;z-index:2}
+.slide.is-prev{transform:translateX(-35px)}
+.slide--alt{background:var(--paper-2)}
+.slide--dark{background:radial-gradient(1200px 700px at 75% -10%,#162033 0%,var(--ink) 65%);color:var(--text-light)}
+.slide__in{width:100%;max-width:1240px;margin:0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:100%}
+.slide__in>*{flex-shrink:0}
+.slide__in.center{align-items:center;text-align:center;justify-content:center;margin:auto}
+
+/* ---------- Type (template) ---------- */
+.kicker{font-family:var(--hand);color:var(--accent);font-size:clamp(1.25rem,2.6vh,1.7rem);font-weight:700;letter-spacing:.02em}
+.kicker--light{color:var(--accent-2)}
+.h2{font-size:clamp(1.7rem,4.4vh,3rem);font-weight:700;letter-spacing:-.02em;margin:.05rem 0 .3rem;color:var(--text)}
+.h2--light{color:#fff}
+.lead{font-size:clamp(1.02rem,2.2vh,1.35rem);color:var(--muted);max-width:1020px;margin:.05rem 0 .6rem;line-height:1.4}
+.lead--light{color:#b4bccb}
+.lead strong{color:var(--text)}
+.lead--light strong{color:#fff}
+.small{font-size:.86rem;color:var(--muted)}
+.mono{font-family:'JetBrains Mono',monospace}
+.tag{display:inline-block;color:#fff;font-size:.78rem;font-weight:700;padding:.18rem .55rem;border-radius:6px;font-family:'Space Grotesk',sans-serif;letter-spacing:.02em;text-transform:uppercase;vertical-align:middle}
+.tag--blue{background:var(--blue)} .tag--orange{background:var(--orange)} .tag--green{background:var(--green)}
+.tag--teal{background:var(--teal)} .tag--red{background:var(--red)} .tag--grape{background:var(--grape)}
+.tag--yellow{background:var(--yellow);color:#111} .tag--ink{background:var(--ink-3)}
+
+/* ---------- Hero (template) ---------- */
+.hero__grid{position:absolute;inset:0;opacity:.35;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+  background-size:40px 40px;
+  -webkit-mask-image:radial-gradient(850px 520px at 60% 30%,#000,transparent 80%);
+          mask-image:radial-gradient(850px 520px at 60% 30%,#000,transparent 80%);}
+.eyebrow{position:relative;display:inline-block;font-family:var(--hand);font-size:clamp(1.1rem,2.4vh,1.5rem);color:var(--accent-2);border:1.8px dashed rgba(255,180,84,.55);padding:.24rem 1rem;border-radius:999px;margin-bottom:1vh;transform:rotate(-1deg)}
+.hero__title{position:relative;font-size:clamp(2.1rem,7vh,4.4rem);font-weight:800;letter-spacing:-.03em;line-height:1.06;max-width:1050px;background:linear-gradient(130deg,#ffffff 40%,var(--accent-2) 90%,var(--accent) 115%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero__sub{position:relative;font-size:clamp(1.05rem,2.6vh,1.5rem);margin:1vh 0 .4vh;color:#b0b8c6;max-width:920px}
+.hero__sub strong{color:#fff}
+.hero__src{position:relative;color:#8b95a8;font-size:.92rem;margin-top:1.2vh}
+.hero__src a{color:var(--accent-2);text-decoration:underline;text-underline-offset:3px}
+
+/* Animated hero funnel chips */
+.hero-funnel{position:relative;display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:2.4vh}
+.hf{background:rgba(255,255,255,.05);border:1px solid #2a354c;border-radius:14px;padding:.7rem 1.1rem;min-width:170px;text-align:left}
+.hf .n{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.7rem,4.4vh,2.5rem);font-weight:800;color:#fff;line-height:1}
+.hf .l{font-size:.82rem;color:#aeb7c7;margin-top:.25rem;line-height:1.3}
+.hf--hot{border-color:var(--accent);background:rgba(255,106,43,.12)}
+.hf--hot .n{color:var(--accent-2)}
+.hf-arrow{align-self:center;color:var(--accent);font-size:1.5rem;font-weight:800}
+@media (max-width:640px){.hf{min-width:132px;flex:1}.hf-arrow{display:none}.hero__title{font-size:clamp(1.85rem,9.2vw,2.5rem);line-height:1.14;padding-top:.06em}.hero__sub{font-size:.98rem}.eyebrow{font-size:1rem;padding:.18rem .8rem}.hf{padding:.55rem .8rem}.hf .n{font-size:1.45rem}.hero-funnel{gap:8px;margin-top:1.6vh}.hero__src{font-size:.82rem}}
+
+/* ---------- Layout helpers ---------- */
+.cols{display:grid;grid-template-columns:1.15fr .85fr;gap:clamp(14px,2.4vw,30px);align-items:start;flex:1}
+.cols--even{grid-template-columns:1fr 1fr}
+@media (max-width:900px){.cols,.cols--even{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px}
+.slide--dark .card{background:var(--ink-2);border-color:var(--line-dark);color:var(--text-light)}
+.card h3{font-size:1.02rem;margin-bottom:.35rem}
+.card p{margin:.3rem 0;font-size:.95rem}
+ul.tight{margin:.2rem 0;padding-left:1.15rem}
+ul.tight li{margin:.32rem 0;font-size:.96rem}
+ul.tight li::marker{color:var(--accent);font-weight:800}
+.stat-row{display:flex;gap:12px;flex-wrap:wrap;margin:.4rem 0}
+.stat{flex:1;min-width:130px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}
+.stat .n{font-family:'Space Grotesk',sans-serif;font-size:1.65rem;font-weight:800;line-height:1.05}
+.stat .l{font-size:.8rem;color:var(--muted);margin-top:.15rem;line-height:1.3}
+.stat--accent .n{color:var(--accent)} .stat--blue .n{color:var(--blue)} .stat--green .n{color:var(--green)} .stat--grape .n{color:var(--grape)} .stat--teal .n{color:var(--teal)}
+.insight{border:1.8px dashed rgba(255,106,43,.55);background:rgba(255,106,43,.06);border-radius:12px;padding:12px 16px;margin-top:12px}
+.insight .ih{font-family:var(--hand);color:var(--accent);font-size:1.15rem;font-weight:700}
+.insight p{margin:.15rem 0 0;font-size:.95rem}
+.replay{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.82rem;background:var(--ink);color:#fff;border:none;border-radius:999px;padding:.42rem 1rem;cursor:pointer;display:inline-flex;gap:.4rem;align-items:center}
+.replay:hover{background:var(--ink-3)}
+.replay--light{background:var(--accent);box-shadow:0 4px 14px var(--accent-glow)}
+.foot{margin-top:auto;padding-top:10px;font-size:.8rem;color:var(--muted)}
+.foot a{color:var(--blue);text-decoration:underline;text-underline-offset:2px}
+
+/* ---------- Funnel chart ---------- */
+.funnel{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.frow{display:grid;grid-template-columns:172px 1fr 92px;gap:12px;align-items:center}
+.frow .fl{font-weight:700;font-size:.92rem;text-align:right;line-height:1.25}
+.frow .fl span{display:block;font-weight:500;font-size:.78rem;color:var(--muted)}
+.ftrack{background:#eee9dd;border-radius:8px;height:44px;overflow:hidden}
+.fbar{height:100%;width:0;border-radius:8px;transition:width 1.1s cubic-bezier(.22,.8,.3,1);display:flex;align-items:center;padding-left:12px;color:#fff;font-family:'JetBrains Mono',monospace;font-size:.78rem;white-space:nowrap}
+.frow .fv{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.3rem}
+@media (max-width:640px){.frow{grid-template-columns:1fr 64px}.frow .fl{text-align:left}.ftrack{grid-column:1/-1;order:3}}
+
+/* ---------- SVG chart generic ---------- */
+.chart-wrap{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px 8px}
+.chart-wrap h3{font-size:1rem;margin-bottom:2px}
+.chart-wrap .sub{font-size:.82rem;color:var(--muted);margin-bottom:6px}
+svg text{font-family:'Inter',sans-serif}
+.bar-rect{transition:height 1s cubic-bezier(.22,.8,.3,1),y 1s cubic-bezier(.22,.8,.3,1)}
+.donut-seg{transition:stroke-dasharray 1.1s cubic-bezier(.22,.8,.3,1)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.85rem;margin-top:6px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* ---------- Pipeline diagram ---------- */
+.pipe{display:flex;gap:8px;align-items:stretch;margin:10px 0 4px;flex-wrap:nowrap}
+.pnode{flex:1;background:#fff;border:2px solid var(--line);border-radius:14px;padding:12px 12px 10px;position:relative;transition:border-color .3s,box-shadow .3s,transform .3s;min-width:0}
+.pnode .pn{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);letter-spacing:.06em}
+.pnode h3{font-size:1rem;margin:.15rem 0 .3rem}
+.pnode p{font-size:.83rem;color:var(--muted);margin:0;line-height:1.4}
+.pnode .out{margin-top:.5rem;font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.05rem}
+.pnode.on{border-color:var(--accent);box-shadow:0 8px 22px var(--accent-glow);transform:translateY(-3px)}
+.pnode.done{border-color:var(--green)}
+.parr{align-self:center;color:var(--accent);font-weight:800;font-size:1.2rem;flex-shrink:0}
+@media (max-width:900px){.pipe{flex-direction:column}.parr{transform:rotate(90deg)}}
+
+/* ---------- KASAN validation loop animation ---------- */
+.loopstage{background:var(--ink);border-radius:14px;padding:16px;color:var(--text-light);position:relative;overflow:hidden}
+.loopstage .ls-title{font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--accent-2);letter-spacing:.08em;text-transform:uppercase}
+.vm{border:1.5px solid #2a354c;border-radius:12px;padding:12px 14px;margin-top:10px;background:var(--ink-2)}
+.vm-head{display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:#aeb7c7}
+.klog{font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.65;margin-top:8px;min-height:118px;white-space:pre-wrap;word-break:break-word}
+.klog .ok{color:#69db7c}.klog .bad{color:#ff8787}.klog .dim{color:#7d8798}.klog .hl{color:var(--accent-2)}
+.loop-steps{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.lstep{flex:1;min-width:104px;border:1.5px solid #2a354c;border-radius:10px;padding:8px 10px;font-size:.8rem;color:#aeb7c7;transition:all .3s;background:var(--ink-2)}
+.lstep b{display:block;color:#dfe5ee;font-family:'Space Grotesk',sans-serif;font-size:.86rem}
+.lstep.on{border-color:var(--accent);color:#fff;background:rgba(255,106,43,.12)}
+.lstep.on b{color:var(--accent-2)}
+
+/* ---------- Exploit / mitigation animation ---------- */
+.escstage{background:var(--ink);border-radius:14px;padding:16px;color:var(--text-light);overflow:hidden}
+.esc-track{position:relative;height:218px;margin-top:8px}
+.esc-user{position:absolute;left:0;bottom:6px;background:#1e2638;border:1.5px solid #2a354c;border-radius:10px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:.8rem}
+.esc-root{position:absolute;right:0;top:0;background:rgba(255,106,43,.14);border:1.5px solid var(--accent);border-radius:10px;padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--accent-2);font-weight:700}
+.shield{position:absolute;left:50%;transform:translateX(-50%);background:#162033;border:1.5px solid #33415e;border-radius:999px;padding:5px 16px;font-family:'JetBrains Mono',monospace;font-size:.78rem;color:#cdd6e4;transition:all .45s;white-space:nowrap}
+.shield.passed{border-color:var(--green);color:#69db7c;background:rgba(43,138,62,.14)}
+.esc-token{position:absolute;left:12%;bottom:52px;width:118px;text-align:center;background:var(--accent);color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:.78rem;border-radius:8px;padding:6px 4px;box-shadow:0 6px 18px var(--accent-glow);transition:all 1.5s cubic-bezier(.3,.7,.3,1);z-index:3}
+.esc-note{font-size:.85rem;color:#aeb7c7;margin-top:6px;min-height:2.4em}
+
+/* ---------- Wrong-0-day diagram ---------- */
+.pathcheck{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:stretch;margin-top:8px}
+@media (max-width:760px){.pathcheck{grid-template-columns:1fr}}
+.pc-box{border:2px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff;font-size:.9rem}
+.pc-box.bad{border-color:var(--red);background:rgba(224,49,49,.05)}
+.pc-box.good{border-color:var(--green);background:rgba(43,138,62,.06)}
+.pc-box h4{font-size:.92rem;margin-bottom:.25rem}
+.pc-mid{align-self:center;font-size:1.6rem;color:var(--accent);font-weight:800;text-align:center}
+
+/* ---------- Controls (template) ---------- */
+.controls{position:fixed;left:0;right:0;bottom:0;height:var(--ctrl-h);z-index:50;background:rgba(11,14,20,.97);border-top:1px solid var(--line-dark);display:flex;align-items:center;gap:14px;padding:0 14px;color:#eceef2}
+.progress{position:absolute;top:-1px;left:0;height:3px;background:var(--accent);width:0;transition:width .35s ease}
+.cbtn{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.85rem;background:var(--ink-2);color:#eceef2;border:1px solid #283347;border-radius:999px;padding:.4rem 1rem;cursor:pointer}
+.cbtn:disabled{opacity:.35;cursor:default}
+.cbtn:not(:disabled):hover{border-color:var(--accent-2)}
+.count{font-family:'JetBrains Mono',monospace;font-size:.85rem;color:#aeb7c7;white-space:nowrap}
+.dots{display:flex;gap:6px;margin:0 auto;flex-wrap:wrap;justify-content:center}
+.dot{width:9px;height:9px;border-radius:50%;border:none;background:#33405a;cursor:pointer;padding:0}
+.dot.is-on{background:var(--accent);transform:scale(1.25)}
+.hint{font-size:.75rem;color:#6d7789;white-space:nowrap}
+@media (max-width:760px){.hint{display:none}.dots{gap:3px}.dot{width:6px;height:6px}.cbtn{padding:.32rem .55rem;font-size:.76rem;white-space:nowrap}.count{font-size:.76rem}.controls{gap:8px;padding:0 8px}}
+
+/* Reveal animation on slide activation — kept short so controls on the
+   active slide are fully opaque almost immediately */
+.rv{opacity:0;transform:translateY(10px)}
+.slide.is-active .rv{animation:rise .3s ease forwards;animation-delay:calc(var(--d,0)*55ms)}
+@keyframes rise{to{opacity:1;transform:none}}
+.rv:has(> button), .rv:has(button.replay), p.lead.rv:has(button){animation-delay:0s!important}
+@media (prefers-reduced-motion:reduce){
+  .slide,.fbar,.bar-rect,.esc-token{transition:none!important}
+  .slide.is-active .rv{animation:none;opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="bar__brand"><span class="bar__logo">⌬</span><span>PATHS TO ROOT · TUTORIAL</span></div>
+  <div class="bar__title" id="slideTitle">A Thousand Fewer Paths to Root</div>
+  <div class="bar__actions">
+    <button type="button" class="bar__btn" id="fsBtn">⛶ Full Screen</button>
+    <a class="bar__cta bar__cta--alt" href="https://openai.com/index/a-thousand-fewer-paths-to-root/" target="_blank" rel="noopener">OpenAI Article ↗</a>
+    <a class="bar__cta" href="https://kenhuangus.github.io/agent-productivity-roi-site/#6" target="_blank" rel="noopener">Template Deck ↗</a>
+  </div>
+</header>
+
+<main class="deck" id="deck">
+
+<!-- ============ SLIDE 1 · HERO ============ -->
+<section class="slide slide--dark is-active" data-title="A Thousand Fewer Paths to Root">
+  <div class="slide__in center">
+    <div class="hero__grid"></div>
+    <div class="eyebrow rv" style="--d:0">OpenAI Cyber Research · Linux Kernel · Animated Tutorial</div>
+    <h1 class="hero__title rv" style="--d:1">A THOUSAND FEWER PATHS TO ROOT</h1>
+    <p class="hero__sub rv" style="--d:2">OpenAI's agents searched the Linux kernel for security bugs. The agents then tested each candidate bug, built working exploits for the real ones, and drafted patches — <strong>far more bugs than a team of people could check one by one</strong>.</p>
+    <div class="hero-funnel rv" style="--d:3">
+      <div class="hf"><div class="n" data-count="2308">0</div><div class="l">candidate findings from Analyst agents</div></div>
+      <div class="hf-arrow">→</div>
+      <div class="hf"><div class="n" data-count="1724">0</div><div class="l">vulnerabilities dynamically reproduced (74.7%)</div></div>
+      <div class="hf-arrow">→</div>
+      <div class="hf hf--hot"><div class="n" data-count="948">0</div><div class="l">distinct local privilege-escalation exploits to root</div></div>
+    </div>
+    <p class="hero__src rv" style="--d:4">Every number in this tutorial comes from OpenAI's report, <a href="https://openai.com/index/a-thousand-fewer-paths-to-root/" target="_blank" rel="noopener">“A thousand fewer paths to root.”</a> Use ← → keys, the dots, or swipe to move through the deck.</p>
+  </div>
+</section>
+
+<!-- ============ SLIDE 2 · WHY LINUX ============ -->
+<section class="slide" data-title="Why the Linux Kernel?">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">The Target</span>
+    <h2 class="h2 rv" style="--d:1">Why the Linux Kernel?</h2>
+    <p class="lead rv" style="--d:2">One codebase sits underneath Android phones, cloud infrastructure, and supercomputers — <strong>billions of people</strong> depend on it. A single local privilege escalation (LPE) there is a path from an unprivileged user to <strong>root</strong>: total control of the machine.</p>
+    <div class="stat-row rv" style="--d:3">
+      <div class="stat stat--accent"><div class="n"><span data-count="40">0</span>M+</div><div class="l">lines of code in the Linux kernel</div></div>
+      <div class="stat stat--blue"><div class="n">4</div><div class="l">major attack surfaces: system calls, networking, filesystems, device drivers</div></div>
+      <div class="stat stat--grape"><div class="n">root</div><div class="l">the prize — an LPE crosses the kernel's core security boundary</div></div>
+    </div>
+    <div class="cols rv" style="--d:4">
+      <div class="card">
+        <h3>Where the work piled up</h3>
+        <p>Models can produce thousands of candidate findings in hours. Each candidate still needs a person to check three things: does the bug reproduce, does it cross a security boundary, and should a maintainer see it before the others? <strong>That checking is the slow part</strong>, and it does not speed up just because the candidate list grows.</p>
+      </div>
+      <div class="card">
+        <h3>The research question</h3>
+        <p>OpenAI built a prototype to test how effectively frontier models could find vulnerabilities <em>and demonstrate their security impact</em> in a codebase of this scale — inside a controlled research environment, reporting to maintainers through the <strong>Patch the Planet</strong> initiative.</p>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:5">
+      <div class="ih">Where most of the work went</div>
+      <p>Spotting a suspicious line of code was not the hard part. The hard part came after it. The team had to test each of the <strong>2,308 candidate findings</strong>, prove which ones gave an attacker root, write <strong>948 patches</strong>, and give the kernel maintainers evidence they could check for each bug.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 3 · FUNNEL ============ -->
+<section class="slide slide--alt" data-title="The Funnel: 2,308 → 1,724 → 948">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">The Headline Result</span>
+    <h2 class="h2 rv" style="--d:1">The Funnel: Candidates → Proof → Root</h2>
+    <p class="lead rv" style="--d:2">The chart below shows how many findings were left after each stage checked the ones before it. <button type="button" class="replay" data-replay="funnel">↻ Replay animation</button></p>
+    <div class="chart-wrap rv" style="--d:3">
+      <h3>Second scan (mid-October 2026, latest kernel master)</h3>
+      <div class="sub">Counts reported by OpenAI. Bar widths are proportional to count.</div>
+      <div class="funnel" id="funnelChart">
+        <div class="frow"><div class="fl">Candidate findings <span>Analyst agents, after deduplication</span></div><div class="ftrack"><div class="fbar" data-w="100" style="background:var(--indigo)"></div></div><div class="fv" data-count="2308">0</div></div>
+        <div class="frow"><div class="fl">Reproduced vulnerabilities <span>PoC triggers the bug under KASAN</span></div><div class="ftrack"><div class="fbar" data-w="74.7" style="background:var(--teal)"></div></div><div class="fv" data-count="1724">0</div></div>
+        <div class="frow"><div class="fl">LPE candidates <span>after permissive screening</span></div><div class="ftrack"><div class="fbar" data-w="53.7" style="background:var(--orange)"></div></div><div class="fv" data-count="1238">0</div></div>
+        <div class="frow"><div class="fl">Working LPE exploits <span>root shell in a hardened VM</span></div><div class="ftrack"><div class="fbar" data-w="50.7" style="background:#e8590c"></div></div><div class="fv" data-count="1169">0</div></div>
+        <div class="frow"><div class="fl">Distinct LPE vulnerabilities <span>after variant analysis — the headline 948</span></div><div class="ftrack"><div class="fbar" data-w="41.1" style="background:var(--accent)"></div></div><div class="fv" data-count="948">0</div></div>
+      </div>
+      <div class="legend"><span><i style="background:var(--teal)"></i>74.7% of candidates reproduced</span><span><i style="background:var(--accent)"></i>41.1% of candidates ended as distinct root exploits</span><span>Plus: 313 info-leak candidates screened → 291 info-leak PoCs</span></div>
+    </div>
+    <div class="insight rv" style="--d:4">
+      <div class="ih">Why 1,169 exploits became “948”</div>
+      <p>Several working exploits can come from the same underlying bug. OpenAI compared the exploits against each other (<strong>variant analysis</strong>) and wrote 948 separate patches. So 948 counts the <em>different bugs</em> behind the 1,169 exploits.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 4 · PIPELINE ============ -->
+<section class="slide" data-title="The Five-Stage Pipeline">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">How It Works</span>
+    <h2 class="h2 rv" style="--d:1">Five Stages, One Pipeline</h2>
+    <p class="lead rv" style="--d:2">Every stage uses the same upcoming cyber model. Press play and watch one finding move through all five stages. <button type="button" class="replay" id="pipePlay">▶ Play pipeline</button></p>
+    <div class="pipe rv" id="pipeRow" style="--d:3">
+      <div class="pnode"><div class="pn">STAGE 1</div><h3>Discovery</h3><p>Scout agents pick high-value audit targets; Analyst agents scan them for candidate findings.</p><div class="out" style="color:var(--indigo)">2,308 candidates</div></div>
+      <div class="parr">→</div>
+      <div class="pnode"><div class="pn">STAGE 2</div><h3>Dynamic Validation</h3><p>Triage agents build PoCs and run them in isolated VMs under KASAN until the bug reproduces.</p><div class="out" style="color:var(--teal)">1,724 reproduced</div></div>
+      <div class="parr">→</div>
+      <div class="pnode"><div class="pn">STAGE 3</div><h3>Exploitability</h3><p>Screening, then ExploitDev agents test real impact against distribution-grade mitigations.</p><div class="out" style="color:var(--orange)">948 distinct LPEs</div></div>
+      <div class="parr">→</div>
+      <div class="pnode"><div class="pn">STAGE 4</div><h3>Patch Generation</h3><p>Agents draft a candidate patch per vulnerability, with static checks and variant analysis.</p><div class="out" style="color:var(--grape)">948 patches</div></div>
+      <div class="parr">→</div>
+      <div class="pnode"><div class="pn">STAGE 5</div><h3>Human Review</h3><p>Researchers verify exploit, patch, and severity before anything goes to maintainers.</p><div class="out" style="color:var(--green)">Reported upstream</div></div>
+    </div>
+    <div class="cols rv" style="--d:4">
+      <div class="card">
+        <h3>What leaves the pipeline</h3>
+        <p>For every vulnerability, the system bundles four artifacts for the human reviewer:</p>
+        <ul class="tight">
+          <li><strong>Root cause analysis</strong> — why the bug exists</li>
+          <li><strong>Minimal crashing PoC</strong> — the smallest trigger</li>
+          <li><strong>A full exploit</strong> — proof of real security impact</li>
+          <li><strong>A candidate patch</strong> — ready for maintainer review</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Why the bundle matters</h3>
+        <p>A maintainer who receives a reproducer, a working exploit, and a patch can check the bug's severity in minutes. A maintainer who receives only a written description has to redo the analysis from the start. The bundle is what let OpenAI send reports at this volume.</p>
+      </div>
+    </div>
+    <p class="foot rv" style="--d:5">The next five slides open up each stage: the agents, the technique, the numbers, and the cost.</p>
+  </div>
+</section>
+<!-- ============ SLIDE 5 · DISCOVERY ============ -->
+<section class="slide slide--alt" data-title="Stage 1 · Discovery: Scouts & Analysts">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">Stage 1 · Discovery</span>
+    <h2 class="h2 rv" style="--d:1">Scouts Pick the Targets. Analysts Read the Code.</h2>
+    <p class="lead rv" style="--d:2">Not every line of the kernel is security-relevant. The pipeline spends its budget where an unprivileged user can actually reach the code.</p>
+    <div class="cols rv" style="--d:3">
+      <div class="card">
+        <h3><span class="tag tag--blue">Scout</span>&nbsp; Pick the targets</h3>
+        <p>Scout agents read every folder and file and score audit targets on two questions:</p>
+        <ul class="tight">
+          <li><strong>Reachability</strong> — can a low-privileged user get here?</li>
+          <li><strong>Security relevance</strong> — does this code guard a boundary?</li>
+        </ul>
+        <div class="stat-row">
+          <div class="stat stat--blue"><div class="n" data-count="5034">0</div><div class="l">audit targets selected</div></div>
+          <div class="stat"><div class="n">2.8M</div><div class="l">lines of code — about 7% of the kernel</div></div>
+          <div class="stat stat--green"><div class="n">$3,426</div><div class="l">API cost of the entire scouting stage</div></div>
+        </div>
+        <p class="small">The scouts cut the code under review to 7% of the kernel. The later stages stayed affordable because they only ran on that 7%.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag tag--grape">Analyst</span>&nbsp; Find the bugs</h3>
+        <p>Analyst agents take one target each and work like a human auditor:</p>
+        <ul class="tight">
+          <li>Read the code to understand how it works</li>
+          <li>Build the target's <strong>threat model</strong></li>
+          <li>Look for vulnerabilities against that model</li>
+        </ul>
+        <div class="stat-row">
+          <div class="stat stat--grape"><div class="n" data-count="2308">0</div><div class="l">candidate findings after deduplication</div></div>
+          <div class="stat"><div class="n">12 hrs</div><div class="l">wall-clock for the full analyst sweep</div></div>
+          <div class="stat stat--accent"><div class="n">$316,549</div><div class="l">API cost — the second-largest stage</div></div>
+        </div>
+        <p class="small">A workflow modeled on the Codex Security plugin: understand first, then hunt.</p>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:4">
+      <div class="ih">Tech detail — why reachability is the filter</div>
+      <p>A memory bug in code that only root can run cannot give an attacker root — the attacker is already there. So the scouts apply the threat model — <strong>the code must be reachable by a low-privileged user with no special capabilities</strong> — before the team spends money on the analyst stage.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 6 · VALIDATION / KASAN ============ -->
+<section class="slide slide--dark" data-title="Stage 2 · Validation Under KASAN">
+  <div class="slide__in">
+    <span class="kicker kicker--light rv" style="--d:0">Stage 2 · Dynamic Validation</span>
+    <h2 class="h2 h2--light rv" style="--d:1">Prove It Crashes: The KASAN Loop</h2>
+    <p class="lead lead--light rv" style="--d:2">At this stage, a candidate finding is only a claim. A triage agent writes a proof-of-concept program, runs it in an isolated VM running a <strong>KASAN</strong> kernel (Kernel Address Sanitizer), reads the console output, and repeats the cycle until the bug triggers or the agent gives up. <button type="button" class="replay replay--light" id="kasanPlay">▶ Run the loop</button></p>
+    <div class="loopstage rv" style="--d:3">
+      <div class="ls-title">Isolated VM · Linux + KASAN · unprivileged user</div>
+      <div class="vm">
+        <div class="vm-head"><span>guest@kasan-vm: ~/poc</span><span id="kasanStatus">● idle</span></div>
+        <div class="klog" id="kasanLog"><span class="dim"># Press “Run the loop” — the agent will write a PoC, trigger the candidate bug,
+# read the KASAN report, refine, and repeat until it reproduces.</span></div>
+      </div>
+      <div class="loop-steps">
+        <div class="lstep" data-ls="0"><b>1 · Generate</b>Agent writes a PoC for the candidate</div>
+        <div class="lstep" data-ls="1"><b>2 · Execute</b>PoC runs as an unprivileged user</div>
+        <div class="lstep" data-ls="2"><b>3 · Observe</b>Program output + system console + KASAN</div>
+        <div class="lstep" data-ls="3"><b>4 · Refine</b>Adjust trigger, repeat until reproduction</div>
+      </div>
+    </div>
+    <div class="stat-row rv" style="--d:4">
+      <div class="stat stat--teal"><div class="n" data-count="1724">0</div><div class="l">vulnerabilities reproduced — 74.7% of all candidates</div></div>
+      <div class="stat"><div class="n">30 hrs</div><div class="l">for the full validation sweep</div></div>
+      <div class="stat stat--green"><div class="n">$73,330</div><div class="l">validation stage cost</div></div>
+      <div class="stat stat--accent"><div class="n">3.1%</div><div class="l">of candidates were simply wrong analysis — the only true false positives</div></div>
+    </div>
+    <div class="insight rv" style="--d:5">
+      <div class="ih">What happened to the other 25.3%?</div>
+      <p style="color:#d6dce7">Most findings that did not reproduce were not wrong. They needed elevated privileges, or they depended on hard race conditions, specific allocation-failure points, or triggers too slow for the time budget (such as refcount wraparound). One cost fact stands out: <strong>checking a false positive costs about the same as checking a true finding</strong>, so the team saves money when it drops bad candidates early.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 7 · EXPLOITABILITY ============ -->
+<section class="slide" data-title="Stage 3 · Exploitability Under Real Mitigations">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">Stage 3 · Exploitability Assessment</span>
+    <h2 class="h2 rv" style="--d:1">From Crash to Root — Past Real Defenses</h2>
+    <p class="lead rv" style="--d:2">Validation shows that a bug exists. It does not show that an attacker can use the bug to gain root. For that test, the ExploitDev agents ran against a <strong>standard distribution kernel</strong> with its normal protections turned on. <button type="button" class="replay" id="escPlay">▶ Run an exploit</button></p>
+    <div class="escstage rv" style="--d:3">
+      <div class="esc-track">
+        <div class="esc-user">uid=1000 (unprivileged)</div>
+        <div class="shield" data-sh="0" style="top:118px">KASLR — kernel addresses randomized</div>
+        <div class="shield" data-sh="1" style="top:76px">SMEP — no executing user code in kernel mode</div>
+        <div class="shield" data-sh="2" style="top:34px">SMAP — no touching user memory from kernel mode</div>
+        <div class="esc-root">uid=0 · root shell</div>
+        <div class="esc-token" id="escToken">exploit →</div>
+      </div>
+      <div class="esc-note" id="escNote">Four mitigations guard the path — KASLR, SMEP, SMAP, and HARDENED_USERCOPY (checked on every copy to/from user memory). Press play to watch an ExploitDev agent work through them.</div>
+    </div>
+    <div class="stat-row rv" style="--d:4">
+      <div class="stat stat--blue"><div class="n"><span data-count="313">0</span> → <span data-count="291">0</span></div><div class="l">info-leak candidates → working info-leak PoCs</div></div>
+      <div class="stat stat--accent"><div class="n"><span data-count="1238">0</span> → <span data-count="1169">0</span></div><div class="l">LPE candidates → working root exploits</div></div>
+      <div class="stat stat--green"><div class="n">$359</div><div class="l">average API cost per successful exploit</div></div>
+      <div class="stat"><div class="n">$775,929</div><div class="l">exploitation stage total — the pipeline's biggest cost</div></div>
+    </div>
+    <div class="insight rv" style="--d:5">
+      <div class="ih">Tech detail — the screening agent is deliberately permissive</div>
+      <p>Before ExploitDev, a screening agent reads each report, crash log, and source code without running anything, and keeps every finding that might lead to an exploit. The team set the screener to keep too much rather than throw away a serious finding. The expensive ExploitDev stage then ran only on the 1,551 findings that passed (313 + 1,238). Screening cost: $44,194.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 8 · COST GRAPH ============ -->
+<section class="slide slide--alt" data-title="Graph · What Each Stage Cost">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">The Economics · Graph 1 of 3</span>
+    <h2 class="h2 rv" style="--d:1">Where the $1.21M Went</h2>
+    <p class="lead rv" style="--d:2">OpenAI published API costs per stage so other researchers can price a reproduction. Total for the October scan: <strong>$1,213,430</strong>. <button type="button" class="replay" data-replay="costs">↻ Replay chart</button></p>
+    <div class="chart-wrap rv" style="--d:3">
+      <h3>API cost by pipeline stage (USD, second scan)</h3>
+      <div class="sub">Log scale — exploitation is ~226× the scouting stage. Hover a bar for the exact figure.</div>
+      <svg id="costChart" viewBox="0 0 860 330" width="100%" role="img" aria-label="Bar chart of API cost per pipeline stage"></svg>
+      <div class="legend"><span>Discovery (Scout + Analyst) = $319,975</span><span>Validation = $73,330</span><span>Screening + Exploitation = $820,123</span></div>
+    </div>
+    <div class="cols rv" style="--d:4">
+      <div class="card">
+        <h3>Failed attempts cost over 10× more than successful ones</h3>
+        <p>Each of the 1,169 successful exploits cost about <strong>$359</strong> on average. Each of the 69 failed attempts cost <strong>$3,922</strong> on average, because the agents kept working on hard cases such as race conditions. OpenAI wrote that a stop rule — end an attempt after one hour with no progress — would have cut that cost.</p>
+      </div>
+      <div class="card">
+        <h3>LPEs cost ~2× info leaks</h3>
+        <p>Per candidate processed: <strong>$558 for an LPE vs $271 for an info leak</strong>. Info-leak PoCs carried over from validation nearly ready; an LPE exploit needs strategy planning, target-object selection, and mitigation bypasses on top.</p>
+      </div>
+    </div>
+    <p class="foot rv" style="--d:5">OpenAI called these costs an <em>upper bound</em>. The team set the runs up to measure what the model could do, not to keep costs down, and OpenAI expects better tooling around the model to lower the cost of every stage.</p>
+  </div>
+</section>
+
+<!-- ============ SLIDE 9 · MODEL GENERATIONS ============ -->
+<section class="slide" data-title="Graph · Stronger Models, More Root">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">Capability Growth · Graph 2 of 3</span>
+    <h2 class="h2 rv" style="--d:1">Same Setup, Stronger Model: 948 Exploits Instead of 166</h2>
+    <p class="lead rv" style="--d:2">OpenAI ran the pipeline three times against the latest kernel code. The chart shows how many distinct LPE exploits each run produced as the model improved. <button type="button" class="replay" data-replay="gens">↻ Replay chart</button></p>
+    <div class="chart-wrap rv" style="--d:3">
+      <h3>Distinct LPE exploits per campaign (end-to-end cost labeled)</h3>
+      <div class="sub">June 2026 result is the earlier Patch the Planet disclosure (24 exploits); July and October are full pipeline scans.</div>
+      <svg id="genChart" viewBox="0 0 860 300" width="100%" role="img" aria-label="Bar chart comparing LPE counts across three model campaigns"></svg>
+    </div>
+    <div class="cols rv" style="--d:4">
+      <div class="card">
+        <h3>The orchestration experiment</h3>
+        <p>GPT‑5.5 Cyber didn't reliably know when to apply known kernel exploitation techniques. Giving it a library of <strong>103 techniques</strong> lifted success on 63 candidates from <strong>76.2% → 88.9%</strong>.</p>
+        <p>GPT‑5.6 Cyber found and applied techniques on its own. The <em>lightly</em> orchestrated 5.6 workflow beat the heavily scaffolded 5.5 one — and adding the technique library back gained only <strong>+1.5 points</strong>.</p>
+      </div>
+      <div class="card">
+        <h3>What the three runs show</h3>
+        <ul class="tight">
+          <li>A stronger model found vulnerabilities in code that an earlier model had already checked and passed over — same setup, same codebase.</li>
+          <li>The extra tooling that raised one model's score added almost nothing for the next model, so a team has to re-measure its tooling each time the model changes.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ============ SLIDE 10 · NOVEL TECHNIQUES ============ -->
+<section class="slide slide--alt" data-title="Novel Exploitation Techniques">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">New Techniques · Graph 3 of 3</span>
+    <h2 class="h2 rv" style="--d:1">10 Techniques Nobody Had Seen</h2>
+    <p class="lead rv" style="--d:2">OpenAI sampled <strong>166 agent-written exploits</strong> and audited the techniques inside them. Ten were new — confirmed novel by third-party kernel exploitation experts. <button type="button" class="replay" data-replay="donut">↻ Replay chart</button></p>
+    <div class="cols cols--even rv" style="--d:3">
+      <div class="chart-wrap">
+        <h3>The 10 novel techniques, by class</h3>
+        <div class="sub">Full technical details withheld by OpenAI for safety; classes as reported.</div>
+        <svg id="donutChart" viewBox="0 0 340 250" width="100%" role="img" aria-label="Donut chart of the ten novel exploitation techniques by class"></svg>
+        <div class="legend">
+          <span><i style="background:var(--accent)"></i>5 · Data-only attacks</span>
+          <span><i style="background:var(--blue)"></i>2 · Persistent elastic objects</span>
+          <span><i style="background:var(--teal)"></i>2 · Page grooming</span>
+          <span><i style="background:var(--grape)"></i>1 · Arbitrary type confusion</span>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3>What each class does</h3>
+          <ul class="tight">
+            <li><strong>Data-only (5)</strong> — the exploit corrupts kernel <em>data</em> and never takes over control flow. It reaches root either directly or through an arbitrary write. Because the attack never redirects execution, defenses that guard control flow do not stop it.</li>
+            <li><strong>Persistent elastic objects (2)</strong> — new kernel objects the agents sprayed into the target cache to shape heap layout reliably.</li>
+            <li><strong>Page grooming (2)</strong> — new ways to arrange memory pages so the vulnerable object lands where the exploit needs it, raising reliability.</li>
+            <li><strong>Type confusion (1)</strong> — an arbitrary type-confusion primitive: the kernel treats an object as the wrong type, opening the door to further corruption.</li>
+          </ul>
+        </div>
+        <div class="insight">
+          <div class="ih">What this shows</div>
+          <p>The agents did more than copy known exploits. In 10 cases they produced techniques that outside experts checked and confirmed nobody had published before. A defender who runs the same kind of model can find these techniques in a lab, before an attacker uses them on a live system.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 11 · BOUNTY ECONOMICS ============ -->
+<section class="slide" data-title="Bounty Economics: What the Exploits Would Have Been Worth">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">The Economics</span>
+    <h2 class="h2 rv" style="--d:1">What the 948 Exploits Would Have Been Worth as Bounties</h2>
+    <p class="lead rv" style="--d:2">Competitions have paid $20,000 to $70,000 for one Linux kernel LPE. At those rates, the 948 exploits add up to far more than the $1.21M the pipeline cost.</p>
+    <div class="stat-row rv" style="--d:3">
+      <div class="stat"><div class="n">$20k–$70k</div><div class="l">historical per-LPE bounty: Pwn2Own $20,000 · TyphoonPWN $70,000</div></div>
+      <div class="stat stat--accent"><div class="n">$18.9M–$66.3M</div><div class="l">hypothetical bounty value of the 948 exploits</div></div>
+      <div class="stat stat--green"><div class="n">16×–55×</div><div class="l">return over the pipeline's $1.21M cost</div></div>
+      <div class="stat"><div class="n">~$1,280</div><div class="l">pipeline cost per distinct LPE ($1,213,430 ÷ 948)</div></div>
+    </div>
+    <div class="cols rv" style="--d:4">
+      <div class="card">
+        <h3>Stress test: Google's kernelCTF</h3>
+        <p>A second run targeted <strong>kernelCTF</strong> — a hardened kernel with a reduced attack surface, under the program's real rules:</p>
+        <ul class="tight">
+          <li><strong>21 LPE exploits + 25 info-leak PoCs</strong> in 112 hours</li>
+          <li>For scale: only <strong>26 confirmed 0-day LPEs</strong> had been accepted by kernelCTF in all of 2026</li>
+          <li>Total cost <strong>$32,936</strong> (discovery was 83.7% of it) → a potential <strong>~$1.5M</strong> bounty, ≈ <strong>45× cost</strong></li>
+          <li>One config change: SLAB_VIRTUAL was dropped — the stock kernel build was incompatible with it</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Why OpenAI ran the numbers this way</h3>
+        <p>An attacker can buy the same kind of model time. A vulnerability that a defender finds and fixes first gives that attacker nothing. OpenAI stated its goal in cost terms: defenders fix enough bugs that an attack <strong>costs more than it pays</strong>.</p>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:5">
+      <div class="ih">What these figures are, and what they are not</div>
+      <p>Nobody paid $18.9M–$66.3M. OpenAI multiplied the 948 exploits by <strong>historical bounty rates</strong> to estimate their value, and the kernelCTF payout would depend on the program accepting the exploits. The costs — $1,213,430 and $32,936 — are the amounts the team actually spent.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 12 · WRONG 0-DAY ============ -->
+<section class="slide slide--alt" data-title="The Wrong-0-Day Trap">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">The Cautionary Tale</span>
+    <h2 class="h2 rv" style="--d:1">The Wrong-0-Day Trap</h2>
+    <p class="lead rv" style="--d:2">The pipeline counted a vulnerability as “exploited” when the agent got a root shell. In an early run, that count was wrong in 20 cases: the agent had reached root through a different bug than the one it was assigned.</p>
+    <div class="stat-row rv" style="--d:3">
+      <div class="stat"><div class="n" data-count="200">0</div><div class="l">exploits reported successful in the early run</div></div>
+      <div class="stat stat--accent"><div class="n" data-count="20">0</div><div class="l">had reached root through a <em>different</em> 0-day than the one assigned — found by humans on review</div></div>
+      <div class="stat stat--blue"><div class="n">10%</div><div class="l">of “successes” proved the wrong bug</div></div>
+    </div>
+    <div class="pathcheck rv" style="--d:4">
+      <div class="pc-box bad">
+        <h4>✗ Result-only verification</h4>
+        <p>The team assigns bug <span class="mono">A</span>. The agent reaches root through an unrelated bug <span class="mono">B</span> that it found on its own. The dashboard records “A exploited.” The team then writes the report, the severity rating, and the patch for the wrong vulnerability.</p>
+      </div>
+      <div class="pc-mid">→</div>
+      <div class="pc-box good">
+        <h4>✓ Check which bug the exploit used (the fix)</h4>
+        <p>OpenAI tightened the task rules and added a <strong>separate check</strong>. The check confirms that each finished exploit triggers the vulnerability the team assigned to that agent. The team counts a root shell as a success only when the check passes.</p>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:5">
+      <div class="ih">Why the check matters</div>
+      <p>A team that records only the final result — root shell or no root shell — cannot tell a real success from a wrong one. OpenAI's reviewers caught the 20 wrong cases because a separate check confirmed which bug each exploit had used. <strong>The same gap can sit inside any agent test that scores the result and never checks how the agent got it.</strong></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 13 · PATCHING + MAINTAINER RACE ============ -->
+<section class="slide" data-title="Stage 4–5 · Patches & the Maintainer Race">
+  <div class="slide__in">
+    <span class="kicker rv" style="--d:0">Stages 4–5 · Patch & Report</span>
+    <h2 class="h2 rv" style="--d:1">Patches, and Fixes That Landed While the Team Worked</h2>
+    <p class="lead rv" style="--d:2">The scan ran on the latest kernel in mid-October 2026. The analysis took 10 days. In those 10 days, upstream developers fixed or started fixing many of the same bugs on their own.</p>
+    <div class="stat-row rv" style="--d:3">
+      <div class="stat stat--green"><div class="n" data-count="61">0</div><div class="l">of the LPEs already patched upstream</div></div>
+      <div class="stat stat--blue"><div class="n" data-count="43">0</div><div class="l">had staging patches in progress</div></div>
+      <div class="stat stat--accent"><div class="n" data-count="299">0</div><div class="l">being reported and discussed publicly</div></div>
+      <div class="stat"><div class="n">10 days</div><div class="l">from scan to completed analysis — the window in which all of the above happened</div></div>
+    </div>
+    <div class="cols rv" style="--d:4">
+      <div class="card">
+        <h3>Patch generation, second version</h3>
+        <p>The model's first patches fixed the bugs but had faults: more code than the fix needed, slower performance in places, style that did not match the surrounding code, and missed variants of the same bug. OpenAI added clearer instructions, automatic code checks, examples of nearby kernel code style, and <strong>variant analysis</strong>. The second version produced patches that fixed the bug with less code and matched kernel style. In a few cases the prototype also caught flaws in <em>patches written by people</em> before those patches were merged.</p>
+      </div>
+      <div class="card">
+        <h3>Two things the run forced the team to do</h3>
+        <ul class="tight">
+          <li><strong>Check each finding again before reporting it.</strong> The team re-checked findings against the current upstream code. Without that step, the team would have sent maintainers reports for bugs that other developers had already fixed.</li>
+          <li><strong>Check the test machines, not only the kernel.</strong> In the kernelCTF run, an agent traced an unexpected crash to a <strong>QEMU TCG</strong> vulnerability — a bug in the <em>emulator</em> that ran the test, not in the kernel — and exploited that bug. The models found bugs in the team's own test setup as well.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot rv" style="--d:5">Per the kernel community's guidance, OpenAI reported critical vulnerabilities first and is working through the rest with Patch the Planet partners.</p>
+  </div>
+</section>
+
+<!-- ============ SLIDE 14 · SYNTHESIS ============ -->
+<section class="slide slide--dark" data-title="Synthesis: Six Lessons">
+  <div class="slide__in">
+    <span class="kicker kicker--light rv" style="--d:0">Synthesis</span>
+    <h2 class="h2 h2--light rv" style="--d:1">Six Points From the Report</h2>
+    <p class="lead lead--light rv" style="--d:2">The main results of “a thousand fewer paths to root,” stated in plain terms.</p>
+    <div class="cols rv" style="--d:3">
+      <div class="card">
+        <h3>1 · The models found candidates fast. The checking took the work.</h3>
+        <p>The Analyst agents produced 2,308 candidate findings. The steps after that took most of the time and money: the team ran proof-of-concept programs to reproduce each bug, tested whether each bug could give an attacker root, wrote a patch for each confirmed bug, and collected the evidence a maintainer needs to review the report.</p>
+        <h3 style="margin-top:.8rem">2 · Check which bug an exploit used, not only whether it reached root</h3>
+        <p>In an early run, 20 of 200 exploits reached root through a different 0-day than the one the team had assigned. OpenAI added a separate check that confirms each exploit triggers its assigned bug before the team counts the exploit as a success.</p>
+        <h3 style="margin-top:.8rem">3 · Failed attempts cost far more than successful ones</h3>
+        <p>The 69 failed exploit attempts cost $3,922 each on average. The 1,169 successful exploits cost about $360 each. OpenAI wrote that stopping an attempt after about one hour with no progress would have cut the cost of the failed attempts.</p>
+      </div>
+      <div class="card">
+        <h3>4 · A stronger model found bugs the earlier model missed</h3>
+        <p>The July scan found 166 distinct LPEs in the kernel. The October scan used a stronger model on the same codebase with the same basic setup and found 948.</p>
+        <h3 style="margin-top:.8rem">5 · Help that one model needs may add little for the next model</h3>
+        <p>Giving GPT‑5.5 Cyber a library of 103 known techniques raised its success rate by 12.7 points. The same library raised GPT‑5.6 Cyber's rate by only 1.5 points, because that model found and applied techniques on its own.</p>
+        <h3 style="margin-top:.8rem">6 · Finding a bug cost far less than the bug's bounty value</h3>
+        <p>The pipeline cost about $1,280 for each distinct LPE it found. Historical bounties for one kernel LPE run from $20,000 to $70,000. That gap holds only for bugs that get fixed before an attacker finds them — an attacker can run the same kind of pipeline.</p>
+      </div>
+    </div>
+    <div class="insight rv" style="--d:4">
+      <div class="ih">Discuss</div>
+      <p style="color:#d6dce7">Which stage of this pipeline matches the slowest stage in your own review process? Where could your own agent tests record a success for the wrong reason, the way the early run did 20 times? And at about $1,280 per bug found, against bounties of $20,000 to $70,000, when would a rescan of your codebase pay for itself?</p>
+    </div>
+    <p class="foot rv" style="--d:5;color:#8b95a8">Source for all figures and claims: OpenAI, <a href="https://openai.com/index/a-thousand-fewer-paths-to-root/" target="_blank" rel="noopener" style="color:var(--accent-2)">“A thousand fewer paths to root”</a> (accessed Nov 5, 2026). Deck format modeled on Ken Huang's <a href="https://kenhuangus.github.io/agent-productivity-roi-site/#6" target="_blank" rel="noopener" style="color:var(--accent-2)">Agentic AI Productivity &amp; Enterprise ROI</a> deck.</p>
+  </div>
+</section>
+</main>
+
+<nav class="controls" aria-label="Slide controls">
+  <div class="progress" id="progress"></div>
+  <button type="button" class="cbtn" id="prevBtn">← Prev</button>
+  <span class="count" id="count">1 / 14</span>
+  <div class="dots" id="dots"></div>
+  <span class="hint">← → · Space · Swipe</span>
+  <button type="button" class="cbtn" id="nextBtn">Next →</button>
+</nav>
+<script>
+(function(){
+"use strict";
+var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+var total = slides.length;
+var prevBtn = document.getElementById("prevBtn");
+var nextBtn = document.getElementById("nextBtn");
+var countEl = document.getElementById("count");
+var dotsWrap = document.getElementById("dots");
+var progress = document.getElementById("progress");
+var titleEl = document.getElementById("slideTitle");
+var cur = 0, started = {};
+
+slides.forEach(function(_, i){
+  var d = document.createElement("button");
+  d.className = "dot"; d.type = "button";
+  d.setAttribute("aria-label", "Go to slide " + (i + 1));
+  d.addEventListener("click", function(){ go(i); });
+  dotsWrap.appendChild(d);
+});
+var dots = Array.prototype.slice.call(dotsWrap.children);
+
+function clamp(i){ return Math.max(0, Math.min(total - 1, i)); }
+
+function go(i){
+  i = clamp(i);
+  slides.forEach(function(s, idx){
+    s.classList.toggle("is-active", idx === i);
+    s.classList.toggle("is-prev", idx < i);
+    if (idx === i) s.scrollTop = 0;
+  });
+  dots.forEach(function(d, idx){ d.classList.toggle("is-on", idx === i); });
+  cur = i;
+  countEl.textContent = (i + 1) + " / " + total;
+  titleEl.textContent = slides[i].getAttribute("data-title") || "";
+  progress.style.width = (total > 1 ? (i / (total - 1) * 100) : 100) + "%";
+  prevBtn.disabled = i === 0;
+  nextBtn.disabled = i === total - 1;
+  if (history.replaceState) history.replaceState(null, "", "#" + (i + 1));
+  animateSlide(i);
+}
+var next = function(){ go(cur + 1); };
+var prev = function(){ go(cur - 1); };
+nextBtn.addEventListener("click", next);
+prevBtn.addEventListener("click", prev);
+
+/* Fullscreen */
+var fsBtn = document.getElementById("fsBtn");
+fsBtn.addEventListener("click", function(){
+  if (document.fullscreenElement) { document.exitFullscreen().catch(function(){}); }
+  else { document.documentElement.requestFullscreen().catch(function(){}); }
+});
+document.addEventListener("fullscreenchange", function(){
+  fsBtn.textContent = document.fullscreenElement ? "⛶ Exit Full" : "⛶ Full Screen";
+});
+
+/* Keyboard */
+document.addEventListener("keydown", function(e){
+  if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); next(); }
+  else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); prev(); }
+  else if (e.key === "Home") { e.preventDefault(); go(0); }
+  else if (e.key === "End") { e.preventDefault(); go(total - 1); }
+  else if (e.key.toLowerCase() === "f") { fsBtn.click(); }
+});
+
+/* Swipe */
+var tx = null;
+document.addEventListener("touchstart", function(e){ tx = e.changedTouches[0].clientX; }, {passive:true});
+document.addEventListener("touchend", function(e){
+  if (tx === null) return;
+  var dx = e.changedTouches[0].clientX - tx; tx = null;
+  if (Math.abs(dx) > 60) { dx < 0 ? next() : prev(); }
+}, {passive:true});
+
+/* ---------- Count-up ---------- */
+function countUp(el){
+  var target = parseFloat(el.getAttribute("data-count"));
+  if (isNaN(target)) return;
+  if (reduced) { el.textContent = target.toLocaleString("en-US"); return; }
+  var t0 = null, dur = 1100;
+  function step(ts){
+    if (!t0) t0 = ts;
+    var p = Math.min(1, (ts - t0) / dur);
+    var eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * eased).toLocaleString("en-US");
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+function runCounters(slide){
+  slide.querySelectorAll("[data-count]").forEach(countUp);
+}
+
+/* ---------- Funnel ---------- */
+function runFunnel(slide){
+  var bars = slide.querySelectorAll(".fbar");
+  bars.forEach(function(b){ b.style.width = "0"; });
+  setTimeout(function(){
+    bars.forEach(function(b, i){
+      setTimeout(function(){ b.style.width = b.getAttribute("data-w") + "%"; }, reduced ? 0 : i * 160);
+      b.textContent = "";
+    });
+  }, 60);
+}
+
+/* ---------- SVG helpers ---------- */
+function el(name, attrs, text){
+  var n = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (var k in attrs) n.setAttribute(k, attrs[k]);
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+/* ---------- Cost chart (log scale) ---------- */
+var COSTS = [
+  {label:"Scout", sub:"targets", val:3426, color:"#1971c2"},
+  {label:"Analyst", sub:"discovery", val:316549, color:"#7048e8"},
+  {label:"Validation", sub:"KASAN triage", val:73330, color:"#0c8599"},
+  {label:"Screening", sub:"static triage", val:44194, color:"#f08c00"},
+  {label:"Info-leak exploits", sub:"ExploitDev", val:84929, color:"#e8590c"},
+  {label:"LPE exploits", sub:"ExploitDev", val:691000, color:"#ff6a2b"}
+];
+function drawCosts(animate){
+  var svg = document.getElementById("costChart"); if (!svg) return;
+  svg.innerHTML = "";
+  var W = 860, base = 272, top = 26, plotH = base - top;
+  var minL = Math.log10(1000), maxL = Math.log10(1000000);
+  function y(v){ return base - (Math.log10(v) - minL) / (maxL - minL) * plotH; }
+  [1000, 10000, 100000, 1000000].forEach(function(g){
+    svg.appendChild(el("line", {x1:56, x2:W-10, y1:y(g), y2:y(g), stroke:"#e4dfd5", "stroke-width":1}));
+    svg.appendChild(el("text", {x:50, y:y(g)+4, "text-anchor":"end", "font-size":11, fill:"#5e6676"}, "$" + (g >= 1000000 ? "1M" : (g/1000) + "k")));
+  });
+  var slot = (W - 70) / COSTS.length;
+  COSTS.forEach(function(c, i){
+    var bw = 74, x = 66 + i * slot + (slot - bw) / 2;
+    var targetY = y(c.val), targetH = base - targetY;
+    var r = el("rect", {x:x, y: animate && !reduced ? base : targetY, width:bw, height: animate && !reduced ? 0 : targetH, rx:6, fill:c.color, "class":"bar-rect"});
+    var t = el("title", {}, c.label + " (" + c.sub + "): $" + c.val.toLocaleString("en-US")); r.appendChild(t);
+    svg.appendChild(r);
+    if (animate && !reduced) setTimeout(function(){ r.setAttribute("y", targetY); r.setAttribute("height", targetH); }, 90 + i * 120);
+    svg.appendChild(el("text", {x:x + bw/2, y:targetY - 8, "text-anchor":"middle", "font-size":13.5, "font-weight":700, fill:"#181b22"}, "$" + c.val.toLocaleString("en-US")));
+    svg.appendChild(el("text", {x:x + bw/2, y:base + 20, "text-anchor":"middle", "font-size":12.5, "font-weight":600, fill:"#181b22"}, c.label));
+    svg.appendChild(el("text", {x:x + bw/2, y:base + 38, "text-anchor":"middle", "font-size":11, fill:"#5e6676"}, c.sub));
+  });
+  svg.appendChild(el("line", {x1:56, x2:W-10, y1:base, y2:base, stroke:"#c9c2b2", "stroke-width":1.5}));
+}
+
+/* ---------- Generations chart ---------- */
+var GENS = [
+  {label:"Jun 2026", model:"GPT-5.5 Cyber", note:"Patch the Planet disclosure", val:24, cost:null, color:"#1971c2"},
+  {label:"Late Jul 2026", model:"GPT-5.6 Sol", note:"first full pipeline scan", val:166, cost:"$513,690", color:"#0c8599"},
+  {label:"Mid-Oct 2026", model:"Upcoming cyber model", note:"second full pipeline scan", val:948, cost:"$1,213,430", color:"#ff6a2b"}
+];
+function drawGens(animate){
+  var svg = document.getElementById("genChart"); if (!svg) return;
+  svg.innerHTML = "";
+  var W = 860, base = 238, top = 30, maxV = 1000;
+  function h(v){ return (v / maxV) * (base - top); }
+  [0, 250, 500, 750, 1000].forEach(function(g){
+    var yy = base - h(g);
+    svg.appendChild(el("line", {x1:56, x2:W-10, y1:yy, y2:yy, stroke:"#e4dfd5", "stroke-width":1}));
+    svg.appendChild(el("text", {x:50, y:yy+4, "text-anchor":"end", "font-size":11, fill:"#5e6676"}, g.toLocaleString("en-US")));
+  });
+  var slot = (W - 70) / GENS.length;
+  GENS.forEach(function(c, i){
+    var bw = 130, x = 66 + i * slot + (slot - bw) / 2;
+    var targetH = Math.max(4, h(c.val)), targetY = base - targetH;
+    var r = el("rect", {x:x, y: animate && !reduced ? base : targetY, width:bw, height: animate && !reduced ? 0 : targetH, rx:7, fill:c.color, "class":"bar-rect"});
+    svg.appendChild(r);
+    if (animate && !reduced) setTimeout(function(){ r.setAttribute("y", targetY); r.setAttribute("height", targetH); }, 90 + i * 160);
+    svg.appendChild(el("text", {x:x + bw/2, y:targetY - 10, "text-anchor":"middle", "font-size":17, "font-weight":800, fill:"#181b22"}, c.val.toLocaleString("en-US") + " LPEs"));
+    svg.appendChild(el("text", {x:x + bw/2, y:base + 20, "text-anchor":"middle", "font-size":12.5, "font-weight":700, fill:"#181b22"}, c.label + " · " + c.model));
+    svg.appendChild(el("text", {x:x + bw/2, y:base + 38, "text-anchor":"middle", "font-size":11, fill:"#5e6676"}, c.note + (c.cost ? " · cost " + c.cost : "")));
+  });
+  svg.appendChild(el("line", {x1:56, x2:W-10, y1:base, y2:base, stroke:"#c9c2b2", "stroke-width":1.5}));
+}
+
+/* ---------- Donut chart ---------- */
+var DONUT = [
+  {label:"Data-only", val:5, color:"#ff6a2b"},
+  {label:"Elastic objects", val:2, color:"#1971c2"},
+  {label:"Page grooming", val:2, color:"#0c8599"},
+  {label:"Type confusion", val:1, color:"#7048e8"}
+];
+function drawDonut(animate){
+  var svg = document.getElementById("donutChart"); if (!svg) return;
+  svg.innerHTML = "";
+  var cx = 125, cy = 118, r = 82, sw = 34;
+  var C = 2 * Math.PI * r, acc = 0, tot = 10;
+  svg.appendChild(el("circle", {cx:cx, cy:cy, r:r, fill:"none", stroke:"#eee9dd", "stroke-width":sw}));
+  DONUT.forEach(function(s, i){
+    var frac = s.val / tot;
+    var seg = el("circle", {cx:cx, cy:cy, r:r, fill:"none", stroke:s.color, "stroke-width":sw,
+      "stroke-dasharray": "0 " + C, "stroke-dashoffset": -acc * C, "class":"donut-seg",
+      transform:"rotate(-90 " + cx + " " + cy + ")"});
+    svg.appendChild(seg);
+    var target = Math.max(0, frac * C - 3);
+    if (animate && !reduced) setTimeout(function(){ seg.setAttribute("stroke-dasharray", target + " " + C); }, 120 + i * 180);
+    else seg.setAttribute("stroke-dasharray", target + " " + C);
+    acc += frac;
+  });
+  svg.appendChild(el("text", {x:cx, y:cy - 4, "text-anchor":"middle", "font-size":30, "font-weight":800, fill:"#181b22", "font-family":"'Space Grotesk',sans-serif"}, "10"));
+  svg.appendChild(el("text", {x:cx, y:cy + 18, "text-anchor":"middle", "font-size":11.5, fill:"#5e6676"}, "novel techniques"));
+  DONUT.forEach(function(s, i){
+    var y = 52 + i * 42;
+    svg.appendChild(el("rect", {x:238, y:y - 11, width:12, height:12, rx:3, fill:s.color}));
+    svg.appendChild(el("text", {x:256, y:y, "font-size":12.5, "font-weight":600, fill:"#181b22"}, s.val + " · " + s.label));
+  });
+}
+
+/* ---------- Pipeline stepper ---------- */
+var pipeTimer = null;
+function playPipeline(){
+  var nodes = Array.prototype.slice.call(document.querySelectorAll("#pipeRow .pnode"));
+  nodes.forEach(function(n){ n.classList.remove("on","done"); });
+  if (pipeTimer) clearInterval(pipeTimer);
+  var i = 0;
+  function tick(){
+    nodes.forEach(function(n, idx){ n.classList.toggle("on", idx === i); if (idx < i) n.classList.add("done"); });
+    i++;
+    if (i > nodes.length) { clearInterval(pipeTimer); nodes.forEach(function(n){ n.classList.remove("on"); n.classList.add("done"); }); }
+  }
+  tick();
+  if (!reduced) pipeTimer = setInterval(tick, 950);
+}
+
+/* ---------- KASAN loop ---------- */
+var kasanTimer = null;
+function playKasan(){
+  var log = document.getElementById("kasanLog");
+  var status = document.getElementById("kasanStatus");
+  var steps = Array.prototype.slice.call(document.querySelectorAll(".lstep"));
+  if (kasanTimer) { clearTimeout(kasanTimer); kasanTimer = null; }
+  var lines = [
+    {t:"$ ./poc_candidate_0417", step:0, cls:""},
+    {t:"[*] triggering ioctl path as uid=1000 … no crash. adjusting size field", step:3, cls:"dim"},
+    {t:"$ ./poc_candidate_0417 --len=0x120", step:0, cls:""},
+    {t:"==================================================================", step:2, cls:"bad"},
+    {t:"BUG: KASAN: slab-out-of-bounds in audited_driver_ioctl+0x1a4/0x2c0", step:2, cls:"bad"},
+    {t:"Write of size 64 at addr ffff88810a3b7fc0 by task poc/812", step:2, cls:"bad"},
+    {t:"==================================================================", step:2, cls:"bad"},
+    {t:"[✓] memory corruption reproduced — measurable, unprivileged, no special caps", step:3, cls:"ok"},
+    {t:"[→] candidate promoted: VALIDATED VULNERABILITY · evidence bundle saved", step:3, cls:"hl"}
+  ];
+  log.innerHTML = ""; status.textContent = "● running"; status.style.color = "#ffb454";
+  steps.forEach(function(s){ s.classList.remove("on"); });
+  var i = 0;
+  function tick(){
+    if (i >= lines.length) {
+      status.textContent = "● reproduced ✓"; status.style.color = "#69db7c";
+      steps.forEach(function(s){ s.classList.remove("on"); });
+      return;
+    }
+    var L = lines[i];
+    var span = document.createElement("span"); if (L.cls) span.className = L.cls;
+    span.textContent = L.t; log.appendChild(span); log.appendChild(document.createTextNode("\n"));
+    steps.forEach(function(s, idx){ s.classList.toggle("on", idx === L.step); });
+    i++;
+    kasanTimer = setTimeout(tick, reduced ? 60 : 620);
+  }
+  tick();
+}
+
+/* ---------- Exploit escalation ---------- */
+function playEsc(){
+  var token = document.getElementById("escToken");
+  var note = document.getElementById("escNote");
+  var shields = Array.prototype.slice.call(document.querySelectorAll(".shield"));
+  shields.forEach(function(s){ s.classList.remove("passed"); });
+  token.style.transition = "none"; token.style.left = "12%"; token.style.bottom = "52px"; token.textContent = "exploit →";
+  void token.offsetWidth;
+  var msgs = [
+    "Step 1 — Info leak defeats KASLR: the agent leaks a kernel pointer, so randomized addresses are known again.",
+    "Step 2 — SMEP blocks running user code in kernel mode, so the exploit goes data-only: corrupt kernel data, never jump to user code.",
+    "Step 3 — SMAP blocks kernel access to user memory; HARDENED_USERCOPY guards every copy. The agent works through in-kernel objects instead.",
+    "Result — credentials overwritten in kernel memory: uid 1000 → uid 0. Root shell. This exact climb is what 1,169 working LPE exploits performed."
+  ];
+  note.textContent = msgs[0];
+  if (reduced) {
+    shields.forEach(function(s){ s.classList.add("passed"); });
+    token.style.left = "auto"; token.style.right = "26px"; token.style.bottom = "172px"; token.textContent = "uid=0 ✓ root";
+    note.textContent = msgs[3];
+    return;
+  }
+  token.style.transition = "all 1.4s cubic-bezier(.3,.7,.3,1)";
+  setTimeout(function(){
+    token.style.bottom = "96px";
+    setTimeout(function(){ shields[0].classList.add("passed"); note.textContent = msgs[1]; token.style.bottom = "132px";
+      setTimeout(function(){ shields[1].classList.add("passed"); note.textContent = msgs[2]; token.style.bottom = "168px";
+        setTimeout(function(){ shields[2].classList.add("passed"); token.style.left = "auto"; token.style.right = "26px"; token.style.bottom = "172px"; token.textContent = "uid=0 ✓ root"; note.textContent = msgs[3]; }, 1100);
+      }, 1100);
+    }, 900);
+  }, 500);
+}
+
+/* ---------- Per-slide animation triggers ---------- */
+function animateSlide(i){
+  var slide = slides[i];
+  runCounters(slide);
+  if (slide.querySelector("#funnelChart")) runFunnel(slide);
+  if (!started[i]) {
+    started[i] = true;
+    if (slide.querySelector("#costChart")) drawCosts(true);
+    if (slide.querySelector("#genChart")) drawGens(true);
+    if (slide.querySelector("#donutChart")) drawDonut(true);
+    if (slide.querySelector("#pipeRow")) setTimeout(playPipeline, 350);
+    if (slide.querySelector("#kasanLog")) setTimeout(playKasan, 400);
+    if (slide.querySelector("#escToken")) setTimeout(playEsc, 400);
+  }
+}
+
+/* Replay buttons */
+document.querySelectorAll("[data-replay]").forEach(function(b){
+  b.addEventListener("click", function(){
+    var kind = b.getAttribute("data-replay"), slide = slides[cur];
+    runCounters(slide);
+    if (kind === "funnel") runFunnel(slide);
+    if (kind === "costs") drawCosts(true);
+    if (kind === "gens") drawGens(true);
+    if (kind === "donut") drawDonut(true);
+  });
+});
+var pp = document.getElementById("pipePlay"); if (pp) pp.addEventListener("click", playPipeline);
+var kp = document.getElementById("kasanPlay"); if (kp) kp.addEventListener("click", playKasan);
+var ep = document.getElementById("escPlay"); if (ep) ep.addEventListener("click", playEsc);
+
+/* Deep link */
+var start = parseInt((location.hash || "").replace("#", ""), 10);
+go(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>
